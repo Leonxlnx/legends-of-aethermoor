@@ -171,9 +171,17 @@ class Game {
     }
 
     startGameLoop() {
+        this.hitStop = 0;
+
         const loop = () => {
             requestAnimationFrame(loop);
-            const dt = Math.min(this.clock.getDelta(), 0.05);
+            let dt = Math.min(this.clock.getDelta(), 0.05);
+
+            // Hit-stop: freeze game briefly on heavy hits for impact
+            if (this.hitStop > 0) {
+                this.hitStop -= dt;
+                dt *= 0.1; // Near-freeze
+            }
 
             // Always update visuals
             this.arena?.update(dt);
@@ -272,7 +280,9 @@ class Game {
 
                 const dist = attackBounds.center.distanceTo(enemy.position);
                 if (dist < attackBounds.radius + 0.5) {
-                    const damage = 15 + this.player.comboStep * 8;
+                    // Damage scales with combo: 18 → 24 → 35 (finisher)
+                    const comboDamage = [18, 24, 35];
+                    const damage = comboDamage[this.player.comboStep] || 18;
                     const knockDir = enemy.position.clone().sub(this.player.position);
                     enemy.takeDamage(damage, knockDir);
                     this.player.hasHitThisSwing = true;
@@ -282,11 +292,13 @@ class Game {
                     hitPos.y += 1.0;
                     this.particles.hitSparks(hitPos);
 
-                    // Screen shake on combo finisher
+                    // Screen shake scales with combo
+                    const shakeAmounts = [0.06, 0.1, 0.25];
+                    this.screenShake = shakeAmounts[this.player.comboStep] || 0.06;
+
+                    // Brief time-slow on finisher
                     if (this.player.comboStep === 2) {
-                        this.screenShake = 0.2;
-                    } else {
-                        this.screenShake = 0.08;
+                        this.hitStop = 0.06; // Freeze for 60ms on heavy hit
                     }
                 }
             }
@@ -300,6 +312,7 @@ class Game {
                 const dist = eBounds.center.distanceTo(this.player.position);
                 if (dist < eBounds.radius) {
                     this.player.takeDamage(enemy.damage, enemy.position);
+                    enemy.markDamageDealt();
                 }
             }
         }

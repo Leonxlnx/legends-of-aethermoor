@@ -89,7 +89,7 @@ export class HUD {
         enemyName.style.cssText = `
       font-family: 'Cinzel', serif;
       font-size: 0.75rem;
-      color: rgba(220, 200, 170, 0.7);
+      color: rgba(200, 200, 210, 0.7);
       letter-spacing: 0.2em;
       text-transform: uppercase;
       margin-bottom: 6px;

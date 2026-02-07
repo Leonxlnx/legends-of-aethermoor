@@ -28,8 +28,8 @@ export class Player {
         this.attackTimer = 0;
         this.comboStep = 0;
         this.comboTimer = 0;
-        this.comboWindow = 0.6;
-        this.attackDuration = 0.35;
+        this.comboWindow = 0.8;
+        this.attackDuration = 0.30;
         this.attackCooldown = 0;
         this.hasHitThisSwing = false;
 
@@ -611,7 +611,7 @@ export class Player {
         center.y += 0.8;
         const fwd = new THREE.Vector3(Math.sin(this.rotation), 0, Math.cos(this.rotation));
         center.add(fwd.multiplyScalar(1.0));
-        return { center, radius: 1.5 };
+        return { center, radius: 1.3 };
     }
 
     takeDamage(amount, sourcePos) {
