@@ -12,23 +12,23 @@ export class PostProcessing {
         const renderPass = new RenderPass(scene, camera);
         this.composer.addPass(renderPass);
 
-        // Bloom (torches, emissives, magic)
+        // Bloom — subtle glow on torches and emissives
         const bloomPass = new UnrealBloomPass(
             new THREE.Vector2(window.innerWidth, window.innerHeight),
-            0.4,   // strength
-            0.6,   // radius
-            0.8    // threshold
+            0.3,   // strength — subtle
+            0.5,   // radius
+            0.85   // threshold — only bright things bloom
         );
         this.composer.addPass(bloomPass);
         this.bloomPass = bloomPass;
 
-        // Vignette + Color Grading
-        const vignetteShader = {
+        // Light vignette + mild color grading (NO heavy darkening)
+        const gradeShader = {
             uniforms: {
                 tDiffuse: { value: null },
-                uVignetteStrength: { value: 0.45 },
-                uSaturation: { value: 0.85 },
-                uContrast: { value: 1.08 },
+                uVignetteStrength: { value: 0.2 },  // Very subtle vignette
+                uSaturation: { value: 0.95 },        // Almost no desaturation
+                uContrast: { value: 1.04 },           // Minimal contrast boost
             },
             vertexShader: `
         varying vec2 vUv;
@@ -47,32 +47,32 @@ export class PostProcessing {
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
           
-          // Vignette
+          // Very light vignette — NOT crushing the edges
           vec2 center = vUv - 0.5;
           float dist = length(center);
-          float vignette = 1.0 - dist * dist * uVignetteStrength * 2.5;
-          vignette = clamp(vignette, 0.0, 1.0);
+          float vignette = 1.0 - dist * dist * uVignetteStrength * 1.5;
+          vignette = clamp(vignette, 0.3, 1.0);  // Never go below 30% brightness
           color.rgb *= vignette;
           
-          // Desaturation (slightly)
+          // Mild saturation adjustment
           float grey = dot(color.rgb, vec3(0.299, 0.587, 0.114));
           color.rgb = mix(vec3(grey), color.rgb, uSaturation);
           
-          // Contrast
+          // Gentle contrast
           color.rgb = (color.rgb - 0.5) * uContrast + 0.5;
           
-          // Cool shadows, warm highlights
+          // Tone shift: cool shadows, warm highlights (very subtle)
           float luminance = dot(color.rgb, vec3(0.299, 0.587, 0.114));
-          color.rgb += vec3(-0.01, -0.005, 0.015) * (1.0 - luminance); // cool shadows
-          color.rgb += vec3(0.01, 0.005, -0.01) * luminance; // warm highlights
+          color.rgb += vec3(-0.005, -0.002, 0.008) * (1.0 - luminance);
+          color.rgb += vec3(0.005, 0.003, -0.005) * luminance;
           
           gl_FragColor = color;
         }
       `,
         };
 
-        const vignettePass = new ShaderPass(vignetteShader);
-        this.composer.addPass(vignettePass);
+        const gradePass = new ShaderPass(gradeShader);
+        this.composer.addPass(gradePass);
     }
 
     render() {

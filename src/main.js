@@ -33,7 +33,7 @@ class Game {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 1.2;
+        this.renderer.toneMappingExposure = 1.6;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         document.body.appendChild(this.renderer.domElement);
 
@@ -97,10 +97,8 @@ class Game {
         const continueEl = document.getElementById('story-continue');
 
         const storyLines = [
-            'You were once a guardian of these halls.',
-            'The corruption came silently,\nconsuming all who stood against it.',
-            'Now you awaken on the altar stone,\nthe last ember of a dying age.',
-            'Remember your training.\nRemember your purpose.',
+            'The ruins remember your name.',
+            'Prove that you remember theirs.',
         ];
 
         overlay.classList.add('visible');
@@ -109,16 +107,11 @@ class Game {
             textEl.textContent = storyLines[i];
             textEl.style.whiteSpace = 'pre-line';
 
-            // Fade in
             await this.delay(300);
             textEl.classList.add('visible');
-
-            // Wait
-            await this.delay(3000);
-
-            // Fade out
+            await this.delay(2500);
             textEl.classList.remove('visible');
-            await this.delay(1200);
+            await this.delay(800);
         }
 
         // Show continue prompt

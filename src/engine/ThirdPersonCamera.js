@@ -8,8 +8,8 @@ export class ThirdPersonCamera {
         this.distance = 6;
         this.minDistance = 3;
         this.maxDistance = 12;
-        this.phi = 0.35;
-        this.theta = 0;
+        this.phi = 0.35;     // Vertical angle (radians above horizontal)
+        this.theta = 0;      // Horizontal angle
         this.sensitivity = 0.002;
         this.minPhi = -0.1;
         this.maxPhi = 1.2;
@@ -27,11 +27,12 @@ export class ThirdPersonCamera {
     }
 
     update(playerPos, mouseDelta, dt) {
-        // Mouse rotation — CORRECT signs:
-        // Mouse right (positive dx) → theta decreases → camera orbits left → view pans right
-        // Mouse up (negative dy) → phi increases → camera goes higher
+        // Horizontal: mouse right (positive dx) → theta decreases → view pans right ✓
         this.theta -= mouseDelta.dx * this.sensitivity;
-        this.phi -= mouseDelta.dy * this.sensitivity;
+
+        // Vertical: mouse up (negative dy) → phi decreases → camera lower → looks UP ✓
+        // mouse down (positive dy) → phi increases → camera higher → looks DOWN ✓
+        this.phi += mouseDelta.dy * this.sensitivity;
         this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi));
 
         // Spherical to cartesian: camera position relative to target
@@ -67,7 +68,7 @@ export class ThirdPersonCamera {
         }
     }
 
-    // Camera-relative forward (direction from camera toward target, XZ only)
+    // Camera-relative forward (XZ only)
     getForward() {
         return new THREE.Vector3(
             -Math.sin(this.theta),
@@ -76,7 +77,7 @@ export class ThirdPersonCamera {
         ).normalize();
     }
 
-    // Camera-relative right (forward × up)
+    // Camera-relative right
     getRight() {
         return new THREE.Vector3(
             Math.cos(this.theta),
