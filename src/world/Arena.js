@@ -20,17 +20,17 @@ export class Arena {
         floorCanvas.height = 1024;
         const fCtx = floorCanvas.getContext('2d');
 
-        // Base stone
-        fCtx.fillStyle = '#3a3632';
+        // Base stone — bright enough for ACES tone mapping
+        fCtx.fillStyle = '#706860';
         fCtx.fillRect(0, 0, 1024, 1024);
 
         // Stone tile pattern
         const tileSize = 64;
         for (let x = 0; x < 1024; x += tileSize) {
             for (let y = 0; y < 1024; y += tileSize) {
-                const brightness = 45 + Math.random() * 20;
-                const offset = Math.random() * 5;
-                fCtx.fillStyle = `rgb(${brightness + offset}, ${brightness - 2}, ${brightness - 5})`;
+                const brightness = 100 + Math.random() * 30;
+                const offset = Math.random() * 8;
+                fCtx.fillStyle = `rgb(${brightness + offset}, ${brightness - 3}, ${brightness - 8})`;
                 fCtx.fillRect(x + 1, y + 1, tileSize - 2, tileSize - 2);
 
                 // Subtle cracks
@@ -84,7 +84,7 @@ export class Arena {
             normalScale: new THREE.Vector2(0.3, 0.3),
             roughness: 0.85,
             metalness: 0.05,
-            color: 0x4a4540,
+            color: 0x9a9488,
         });
 
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -95,7 +95,7 @@ export class Arena {
         const outerGeo = new THREE.RingGeometry(floorRadius, floorRadius + 30, 64);
         outerGeo.rotateX(-Math.PI / 2);
         const outerMat = new THREE.MeshStandardMaterial({
-            color: 0x2a2520,
+            color: 0x4a4540,
             roughness: 1.0,
             metalness: 0,
         });
@@ -135,7 +135,7 @@ export class Arena {
         // Base
         const baseGeo = new THREE.CylinderGeometry(0.7, 0.8, 0.4, 8);
         const stoneMat = new THREE.MeshStandardMaterial({
-            color: 0x55504a,
+            color: 0x7a756e,
             roughness: 0.9,
             metalness: 0.02,
         });
@@ -338,8 +338,8 @@ export class Arena {
     }
 
     setupLighting() {
-        // Main directional (dramatic sidelight)
-        const dirLight = new THREE.DirectionalLight(0xffeedd, 0.6);
+        // Main directional (dramatic sidelight — strong enough for ACES)
+        const dirLight = new THREE.DirectionalLight(0xffeedd, 1.4);
         dirLight.position.set(30, 40, -20);
         dirLight.castShadow = true;
         dirLight.shadow.mapSize.set(2048, 2048);
@@ -353,16 +353,16 @@ export class Arena {
         this.scene.add(dirLight);
 
         // Soft fill from opposite side
-        const fillLight = new THREE.DirectionalLight(0x8899bb, 0.2);
+        const fillLight = new THREE.DirectionalLight(0x8899bb, 0.5);
         fillLight.position.set(-20, 15, 15);
         this.scene.add(fillLight);
 
         // Hemisphere ambient
-        const hemi = new THREE.HemisphereLight(0x445566, 0x1a1510, 0.35);
+        const hemi = new THREE.HemisphereLight(0x445566, 0x332820, 0.6);
         this.scene.add(hemi);
 
         // Ground-level ambient for character readability
-        const ground = new THREE.PointLight(0x554433, 0.3, 40);
+        const ground = new THREE.PointLight(0x887766, 0.6, 40);
         ground.position.set(0, 0.5, 0);
         this.scene.add(ground);
 

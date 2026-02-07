@@ -8,8 +8,8 @@ export class ThirdPersonCamera {
         this.distance = 6;
         this.minDistance = 3;
         this.maxDistance = 12;
-        this.phi = 0.35;              // vertical angle (0 = level, positive = above)
-        this.theta = 0;               // horizontal angle
+        this.phi = 0.35;
+        this.theta = 0;
         this.sensitivity = 0.002;
         this.minPhi = -0.1;
         this.maxPhi = 1.2;
@@ -17,11 +17,8 @@ export class ThirdPersonCamera {
         // Smooth follow
         this.currentPos = new THREE.Vector3();
         this.currentLookAt = new THREE.Vector3();
-        this.targetOffset = new THREE.Vector3(0, 1.6, 0); // Look at character upper body
+        this.targetOffset = new THREE.Vector3(0, 1.6, 0);
         this.smoothSpeed = 6;
-
-        // Collision
-        this.raycaster = new THREE.Raycaster();
 
         // Cinematic mode
         this.cinematicTarget = null;
@@ -30,20 +27,22 @@ export class ThirdPersonCamera {
     }
 
     update(playerPos, mouseDelta, dt) {
-        // Mouse rotation — FIXED: correct directions
-        this.theta += mouseDelta.dx * this.sensitivity;  // FIXED: was -= (caused mirroring)
-        this.phi += mouseDelta.dy * this.sensitivity;     // FIXED: was -= 
+        // Mouse rotation — CORRECT signs:
+        // Mouse right (positive dx) → theta decreases → camera orbits left → view pans right
+        // Mouse up (negative dy) → phi increases → camera goes higher
+        this.theta -= mouseDelta.dx * this.sensitivity;
+        this.phi -= mouseDelta.dy * this.sensitivity;
         this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi));
 
-        // Calculate ideal orbital position
+        // Spherical to cartesian: camera position relative to target
         const lookTarget = playerPos.clone().add(this.targetOffset);
 
-        const idealX = lookTarget.x + this.distance * Math.sin(this.theta) * Math.cos(this.phi);
+        const idealX = lookTarget.x + this.distance * Math.cos(this.phi) * Math.sin(this.theta);
         const idealY = lookTarget.y + this.distance * Math.sin(this.phi);
-        const idealZ = lookTarget.z + this.distance * Math.cos(this.theta) * Math.cos(this.phi);
+        const idealZ = lookTarget.z + this.distance * Math.cos(this.phi) * Math.cos(this.theta);
         const idealPos = new THREE.Vector3(idealX, idealY, idealZ);
 
-        // Ensure camera doesn't go below ground
+        // Clamp above ground
         idealPos.y = Math.max(idealPos.y, 1.0);
 
         // Smooth interpolation
@@ -51,11 +50,11 @@ export class ThirdPersonCamera {
         this.currentPos.lerp(idealPos, lerpFactor);
         this.currentLookAt.lerp(lookTarget, lerpFactor);
 
-        // Cinematic override (for intro)
+        // Cinematic override
         if (this.cinematicTarget) {
             this.cinematicBlend = Math.min(1, this.cinematicBlend + dt * 0.8);
             const t = this.cinematicBlend;
-            const smoothT = t * t * (3 - 2 * t); // smoothstep
+            const smoothT = t * t * (3 - 2 * t);
 
             const finalPos = this.currentPos.clone().lerp(this.cinematicPos, smoothT);
             const finalLook = this.currentLookAt.clone().lerp(this.cinematicTarget, smoothT);
@@ -68,7 +67,7 @@ export class ThirdPersonCamera {
         }
     }
 
-    // Camera-relative movement directions
+    // Camera-relative forward (direction from camera toward target, XZ only)
     getForward() {
         return new THREE.Vector3(
             -Math.sin(this.theta),
@@ -77,21 +76,20 @@ export class ThirdPersonCamera {
         ).normalize();
     }
 
+    // Camera-relative right (forward × up)
     getRight() {
         return new THREE.Vector3(
-            -Math.cos(this.theta),
+            Math.cos(this.theta),
             0,
-            Math.sin(this.theta)
+            -Math.sin(this.theta)
         ).normalize();
     }
 
-    // Zoom
     handleScroll(deltaY) {
         this.distance += deltaY * 0.003;
         this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
     }
 
-    // Cinematic: smoothly move camera to a fixed view
     setCinematic(position, lookAt) {
         this.cinematicPos = position.clone();
         this.cinematicTarget = lookAt.clone();

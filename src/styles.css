@@ -37,7 +37,7 @@ canvas {
   font-weight: 400;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(200, 185, 155, 0.8);
+  color: rgba(190, 190, 195, 0.8);
   margin-bottom: 40px;
 }
 
@@ -52,7 +52,7 @@ canvas {
 .loading-bar-fill {
   width: 0%;
   height: 100%;
-  background: rgba(180, 160, 120, 0.6);
+  background: rgba(170, 170, 180, 0.6);
   transition: width 0.5s ease;
 }
 
@@ -81,7 +81,7 @@ canvas {
   font-size: clamp(0.85rem, 2vw, 1rem);
   line-height: 2.2;
   letter-spacing: 0.08em;
-  color: rgba(200, 185, 155, 0.75);
+  color: rgba(195, 195, 200, 0.75);
   text-align: center;
   opacity: 0;
   transform: translateY(10px);
@@ -102,7 +102,7 @@ canvas {
   font-size: 0.65rem;
   letter-spacing: 0.4em;
   text-transform: uppercase;
-  color: rgba(160, 145, 120, 0.4);
+  color: rgba(160, 160, 165, 0.4);
   opacity: 0;
   transition: opacity 1.5s ease;
   animation: pulse-subtle 2.5s ease-in-out infinite;
@@ -147,7 +147,7 @@ canvas {
   font-weight: 400;
   letter-spacing: 0.25em;
   text-transform: uppercase;
-  color: rgba(180, 165, 135, 0.6);
+  color: rgba(185, 185, 190, 0.6);
   animation: pulse-subtle 3s ease-in-out infinite;
 }
 
@@ -186,18 +186,18 @@ canvas {
   font-size: 0.8rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: rgba(200, 185, 155, 0.6);
+  color: rgba(195, 195, 200, 0.6);
   background: none;
-  border: 1px solid rgba(120, 100, 75, 0.3);
+  border: 1px solid rgba(120, 120, 125, 0.3);
   padding: 12px 40px;
   cursor: pointer;
   transition: all 0.4s ease;
 }
 
 #death-screen button:hover {
-  color: rgba(220, 205, 175, 0.9);
-  border-color: rgba(160, 140, 105, 0.5);
-  background: rgba(80, 70, 55, 0.1);
+  color: rgba(215, 215, 220, 0.9);
+  border-color: rgba(155, 155, 160, 0.5);
+  background: rgba(80, 80, 85, 0.1);
 }
 
 /* ===== DAMAGE FLASH ===== */

@@ -4,8 +4,9 @@ export class Tutorial {
             {
                 id: 'look',
                 text: 'Move your mouse to look around',
-                condition: (input, player, data) => {
-                    data.totalMouse = (data.totalMouse || 0) + Math.abs(input.mouse.dx) + Math.abs(input.mouse.dy);
+                condition: (input, player, data, mouseDelta) => {
+                    // Use the already-consumed mouseDelta instead of input.mouse (which is reset)
+                    data.totalMouse = (data.totalMouse || 0) + Math.abs(mouseDelta.dx) + Math.abs(mouseDelta.dy);
                     return data.totalMouse > 300;
                 },
                 onStart: (player) => { player.canMove = false; player.canAttack = false; },
@@ -70,7 +71,7 @@ export class Tutorial {
         this.showTime = 0;
         this.dummySpawned = false;
 
-        // Create DOM element
+        // Create DOM element — clean silver/white text, no gold
         this.el = document.createElement('div');
         this.el.id = 'tutorial-prompt';
         this.el.style.cssText = `
@@ -78,7 +79,7 @@ export class Tutorial {
       bottom: 25%;
       left: 50%;
       transform: translateX(-50%);
-      color: rgba(220, 210, 190, 0.9);
+      color: rgba(210, 210, 210, 0.9);
       font-family: 'Cinzel', serif;
       font-size: 1.1rem;
       letter-spacing: 0.15em;
@@ -87,7 +88,7 @@ export class Tutorial {
       pointer-events: none;
       opacity: 0;
       transition: opacity 0.8s ease;
-      text-shadow: 0 0 20px rgba(180, 160, 120, 0.3);
+      text-shadow: 0 0 20px rgba(150, 150, 160, 0.3);
       z-index: 50;
     `;
         document.body.appendChild(this.el);
@@ -99,7 +100,7 @@ export class Tutorial {
       font-family: 'Inter', sans-serif;
       font-size: 0.7rem;
       letter-spacing: 0.3em;
-      color: rgba(180, 170, 150, 0.5);
+      color: rgba(170, 170, 175, 0.5);
       text-transform: uppercase;
     `;
         this.el.appendChild(this.keySub);
@@ -128,7 +129,7 @@ export class Tutorial {
         this.showTime = 0;
     }
 
-    update(dt, input, player) {
+    update(dt, input, player, mouseDelta) {
         if (!this.active || this.completed) return null;
 
         this.showTime += dt;
@@ -139,8 +140,11 @@ export class Tutorial {
             step.onStart(player);
         }
 
+        // Provide a default mouseDelta if not passed
+        const md = mouseDelta || { dx: 0, dy: 0 };
+
         // Check completion
-        if (step.condition(input, player, this.stepData)) {
+        if (step.condition(input, player, this.stepData, md)) {
             // Fade out current
             this.el.style.opacity = '0';
 

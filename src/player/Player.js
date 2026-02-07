@@ -354,8 +354,8 @@ export class Player {
 
         if (input.isKey('KeyW')) move.add(forward);
         if (input.isKey('KeyS')) move.sub(forward);
-        if (input.isKey('KeyA')) move.add(right);
-        if (input.isKey('KeyD')) move.sub(right);
+        if (input.isKey('KeyA')) move.sub(right);
+        if (input.isKey('KeyD')) move.add(right);
 
         this.isMoving = move.lengthSq() > 0.01;
         this.isSprinting = this.isMoving && input.isKey('ShiftLeft') && this.stamina > 5;
@@ -463,8 +463,8 @@ export class Player {
 
             if (input.isKey('KeyW')) move.add(forward);
             else if (input.isKey('KeyS')) move.sub(forward);
-            else if (input.isKey('KeyA')) move.add(right);
-            else if (input.isKey('KeyD')) move.sub(right);
+            else if (input.isKey('KeyA')) move.sub(right);
+            else if (input.isKey('KeyD')) move.add(right);
 
             if (move.lengthSq() < 0.01) {
                 // Dodge backward

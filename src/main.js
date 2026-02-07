@@ -33,7 +33,7 @@ class Game {
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-        this.renderer.toneMappingExposure = 0.9;
+        this.renderer.toneMappingExposure = 1.2;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         document.body.appendChild(this.renderer.domElement);
 
@@ -199,7 +199,7 @@ class Game {
 
                 // Tutorial
                 if (this.tutorial && this.tutorial.active) {
-                    const cmd = this.tutorial.update(dt, this.input, this.player);
+                    const cmd = this.tutorial.update(dt, this.input, this.player, mouseDelta);
                     if (cmd === 'spawnDummy') {
                         this.spawnDummy();
                     }
