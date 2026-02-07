@@ -1,136 +1,100 @@
 import * as THREE from 'three';
 
 export class Sky {
-    constructor(scene) {
-        this.scene = scene;
-        this.timeOfDay = 0.35; // start at morning
-        this.daySpeed = 0.008;
-        this.sunLight = null;
-        this.ambientLight = null;
-        this.create();
-    }
+  constructor(scene) {
+    this.scene = scene;
+    this.create();
+  }
 
-    create() {
-        // Hemisphere light for ambient
-        this.ambientLight = new THREE.HemisphereLight(0x87ceeb, 0x362d1a, 0.4);
-        this.scene.add(this.ambientLight);
+  create() {
+    // Dramatic twilight sky dome — frozen at dusk
+    const skyGeo = new THREE.SphereGeometry(200, 32, 16);
 
-        // Directional sun light
-        this.sunLight = new THREE.DirectionalLight(0xffeedd, 1.2);
-        this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.set(2048, 2048);
-        this.sunLight.shadow.camera.left = -80;
-        this.sunLight.shadow.camera.right = 80;
-        this.sunLight.shadow.camera.top = 80;
-        this.sunLight.shadow.camera.bottom = -80;
-        this.sunLight.shadow.camera.near = 0.5;
-        this.sunLight.shadow.camera.far = 200;
-        this.sunLight.shadow.bias = -0.001;
-        this.scene.add(this.sunLight);
-
-        // Sky dome
-        const skyGeo = new THREE.SphereGeometry(300, 32, 16);
-        const skyMat = new THREE.ShaderMaterial({
-            side: THREE.BackSide,
-            uniforms: {
-                sunDir: { value: new THREE.Vector3(0, 1, 0) },
-                timeOfDay: { value: 0.35 }
-            },
-            vertexShader: `
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uTime: { value: 0 },
+      },
+      vertexShader: `
         varying vec3 vWorldPos;
         void main() {
-          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          vWorldPos = position;
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }
       `,
-            fragmentShader: `
-        uniform vec3 sunDir;
-        uniform float timeOfDay;
+      fragmentShader: `
+        uniform float uTime;
         varying vec3 vWorldPos;
+        
+        // Simple hash for stars
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+        }
+        
         void main() {
           vec3 dir = normalize(vWorldPos);
-          float y = dir.y * 0.5 + 0.5;
+          float y = dir.y;
           
-          // Day colors
-          vec3 dayTop = vec3(0.25, 0.55, 0.95);
-          vec3 dayBottom = vec3(0.6, 0.8, 1.0);
-          vec3 dayColor = mix(dayBottom, dayTop, y);
+          // Horizon to zenith gradient — deep dusk
+          vec3 horizonColor = vec3(0.22, 0.12, 0.08); // warm amber horizon
+          vec3 midColor = vec3(0.08, 0.06, 0.12);     // deep purple mid
+          vec3 zenithColor = vec3(0.02, 0.02, 0.06);  // near-black zenith
           
-          // Sunset colors
-          vec3 sunsetTop = vec3(0.15, 0.15, 0.35);
-          vec3 sunsetBottom = vec3(0.9, 0.4, 0.15);
-          vec3 sunsetColor = mix(sunsetBottom, sunsetTop, y);
-          
-          // Night colors
-          vec3 nightTop = vec3(0.02, 0.02, 0.08);
-          vec3 nightBottom = vec3(0.05, 0.05, 0.12);
-          vec3 nightColor = mix(nightBottom, nightTop, y);
-          
-          // Blend based on time
-          float t = timeOfDay;
-          vec3 color;
-          if (t < 0.25) { // night to dawn
-            color = mix(nightColor, sunsetColor, t / 0.25);
-          } else if (t < 0.35) { // dawn to day
-            color = mix(sunsetColor, dayColor, (t - 0.25) / 0.1);
-          } else if (t < 0.65) { // day
-            color = dayColor;
-          } else if (t < 0.75) { // day to sunset
-            color = mix(dayColor, sunsetColor, (t - 0.65) / 0.1);
-          } else if (t < 0.85) { // sunset to night
-            color = mix(sunsetColor, nightColor, (t - 0.75) / 0.1);
-          } else { // night
-            color = nightColor;
+          vec3 sky;
+          if (y < 0.0) {
+            // Below horizon — dark ground fog
+            sky = vec3(0.05, 0.04, 0.03);
+          } else if (y < 0.15) {
+            // Horizon glow
+            float t = y / 0.15;
+            sky = mix(horizonColor, midColor, t);
+            // Warm glow at horizon
+            sky += vec3(0.12, 0.04, 0.01) * (1.0 - t) * (1.0 - t);
+          } else if (y < 0.5) {
+            float t = (y - 0.15) / 0.35;
+            sky = mix(midColor, zenithColor, t);
+          } else {
+            sky = zenithColor;
           }
           
-          // Sun glow
-          float sunDot = max(0.0, dot(dir, normalize(sunDir)));
-          float sunGlow = pow(sunDot, 32.0) * 0.8;
-          float sunDisc = pow(sunDot, 256.0) * 2.0;
-          color += vec3(1.0, 0.9, 0.7) * (sunGlow + sunDisc);
+          // Stars (only above mid-sky)
+          if (y > 0.2) {
+            vec2 starUV = dir.xz / (dir.y + 0.01) * 80.0;
+            float star = hash(floor(starUV));
+            float brightness = step(0.995, star);
+            // Twinkle
+            brightness *= 0.5 + 0.5 * sin(uTime * (2.0 + star * 4.0) + star * 100.0);
+            float fade = smoothstep(0.2, 0.5, y);
+            sky += vec3(brightness * fade * 0.8);
+          }
           
-          gl_FragColor = vec4(color, 1.0);
+          // Subtle moon glow (fixed position)
+          vec3 moonDir = normalize(vec3(0.5, 0.7, -0.3));
+          float moonDist = length(dir - moonDir);
+          float moonGlow = exp(-moonDist * 4.0) * 0.15;
+          sky += vec3(0.7, 0.75, 0.9) * moonGlow;
+          
+          // Tiny moon disc
+          float moonDisc = smoothstep(0.025, 0.02, moonDist);
+          sky += vec3(0.9, 0.92, 1.0) * moonDisc * 0.6;
+          
+          gl_FragColor = vec4(sky, 1.0);
         }
-      `
-        });
+      `,
+    });
 
-        this.skyMesh = new THREE.Mesh(skyGeo, skyMat);
-        this.scene.add(this.skyMesh);
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    this.skyMesh = skyMesh;
+    this.scene.add(skyMesh);
 
-        // Fog
-        this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.003);
+    // Background color for renderer
+    this.scene.background = null; // Let sky dome handle it
+  }
+
+  update(dt) {
+    if (this.skyMesh) {
+      this.skyMesh.material.uniforms.uTime.value += dt;
     }
-
-    update(dt) {
-        this.timeOfDay += this.daySpeed * dt;
-        if (this.timeOfDay > 1) this.timeOfDay = 0;
-
-        // Sun position
-        const angle = this.timeOfDay * Math.PI * 2 - Math.PI / 2;
-        const sunX = Math.cos(angle) * 100;
-        const sunY = Math.sin(angle) * 100;
-        const sunZ = 50;
-
-        this.sunLight.position.set(sunX, Math.max(5, sunY), sunZ);
-
-        // Adjust light intensity based on time
-        const dayFactor = Math.max(0, Math.sin(this.timeOfDay * Math.PI));
-        this.sunLight.intensity = dayFactor * 1.5;
-        this.ambientLight.intensity = 0.15 + dayFactor * 0.4;
-
-        // Sunset warmth
-        const sunsetFactor = Math.max(0, 1 - Math.abs(this.timeOfDay - 0.7) * 10);
-        const r = 1.0, g = 1.0 - sunsetFactor * 0.3, b = 0.9 - sunsetFactor * 0.4;
-        this.sunLight.color.setRGB(r, g, b);
-
-        // Update sky shader
-        this.skyMesh.material.uniforms.sunDir.value.set(sunX, sunY, sunZ).normalize();
-        this.skyMesh.material.uniforms.timeOfDay.value = this.timeOfDay;
-
-        // Update fog color
-        const fogDay = new THREE.Color(0x87ceeb);
-        const fogNight = new THREE.Color(0x0a0a15);
-        const fogColor = fogDay.clone().lerp(fogNight, 1 - dayFactor);
-        this.scene.fog.color.copy(fogColor);
-    }
+  }
 }

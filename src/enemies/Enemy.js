@@ -1,295 +1,391 @@
 import * as THREE from 'three';
 
-const ENEMY_TYPES = {
-    goblin: { color: 0x4a8a2a, bodyHeight: 0.8, speed: 6, health: 40, damage: 10, attackRange: 1.8, aggroRange: 20, bodyScale: 0.7, name: 'Forest Goblin' },
-    orc: { color: 0x5a4a3a, bodyHeight: 1.4, speed: 3.5, health: 100, damage: 25, attackRange: 2.5, aggroRange: 18, bodyScale: 1.2, name: 'Corrupted Orc' },
-    skeleton: { color: 0xccccaa, bodyHeight: 1.1, speed: 4, health: 50, damage: 15, attackRange: 12, aggroRange: 25, bodyScale: 0.85, name: 'Shadow Archer', ranged: true },
-};
-
 export class Enemy {
-    constructor(scene, terrain, x, z, type = 'goblin') {
+    constructor(scene, x, z, type = 'dummy') {
         this.scene = scene;
-        this.terrain = terrain;
-        this.config = ENEMY_TYPES[type];
         this.type = type;
-        this.name = this.config.name;
+        this.position = new THREE.Vector3(x, 0, z);
+        this.rotation = 0;
+        this.targetRotation = 0;
 
-        const h = terrain.getHeightAt(x, z);
-        this.position = new THREE.Vector3(x, h, z);
-        this.spawnPos = this.position.clone();
-        this.velocity = new THREE.Vector3();
-        this.rotation = Math.random() * Math.PI * 2;
+        // Stats based on type
+        if (type === 'dummy') {
+            this.maxHealth = 999;
+            this.health = 999;
+            this.damage = 0;
+            this.speed = 0;
+            this.attackRange = 0;
+            this.aggroRange = 0;
+            this.name = 'Training Dummy';
+            this.bodyColor = 0x5a4a38;
+            this.height = 1.6;
+            this.isDummy = true;
+        } else {
+            this.maxHealth = 60;
+            this.health = 60;
+            this.damage = 15;
+            this.speed = 3.5;
+            this.attackRange = 2.0;
+            this.aggroRange = 15;
+            this.name = 'Shadow Warrior';
+            this.bodyColor = 0x1a1518;
+            this.height = 1.8;
+            this.isDummy = false;
+        }
 
-        this.health = this.config.health;
-        this.maxHealth = this.config.health;
         this.alive = true;
-        this.state = 'patrol'; // patrol, chase, attack, stagger, dead
+        this.state = 'idle'; // idle, chase, attack, stagger, dead
         this.stateTimer = 0;
-        this.attackCooldown = 0;
-        this.patrolTarget = this.getRandomPatrolPoint();
-        this.hitFlash = 0;
+        this.attackTimer = 0;
+        this.attackCooldown = 1.5;
+        this.staggerTimer = 0;
+        this.staggerDuration = 0.5;
         this.deathTimer = 0;
-        this.animTimer = Math.random() * 10;
+        this.hitFlash = 0;
 
         this.createModel();
     }
 
-    getRandomPatrolPoint() {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 5 + Math.random() * 10;
-        return new THREE.Vector3(
-            this.spawnPos.x + Math.cos(angle) * dist,
-            0,
-            this.spawnPos.z + Math.sin(angle) * dist
-        );
-    }
-
     createModel() {
         this.group = new THREE.Group();
-        const c = this.config;
-        const s = c.bodyScale;
 
-        // Body
-        const bodyGeo = new THREE.CylinderGeometry(0.25 * s, 0.3 * s, c.bodyHeight, 6);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.8 });
-        const body = new THREE.Mesh(bodyGeo, bodyMat);
-        body.position.y = c.bodyHeight / 2 + 0.3;
-        body.castShadow = true;
-        this.group.add(body);
-
-        // Head
-        const headGeo = new THREE.SphereGeometry(0.2 * s, 6, 4);
-        const headMat = new THREE.MeshStandardMaterial({ color: c.color, roughness: 0.7 });
-        const head = new THREE.Mesh(headGeo, headMat);
-        head.position.y = c.bodyHeight + 0.5;
-        this.group.add(head);
-
-        // Eyes (red glowing)
-        const eyeGeo = new THREE.SphereGeometry(0.04 * s, 4, 4);
-        const eyeMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 2 });
-        const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
-        leftEye.position.set(-0.08 * s, c.bodyHeight + 0.52, -0.15 * s);
-        this.group.add(leftEye);
-        const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
-        rightEye.position.set(0.08 * s, c.bodyHeight + 0.52, -0.15 * s);
-        this.group.add(rightEye);
-
-        // Weapon
-        if (this.config.ranged) {
-            // Bow
-            const bowGeo = new THREE.TorusGeometry(0.3 * s, 0.02, 4, 8, Math.PI);
-            const bowMat = new THREE.MeshStandardMaterial({ color: 0x5a3a1a });
-            const bow = new THREE.Mesh(bowGeo, bowMat);
-            bow.position.set(0.35 * s, c.bodyHeight * 0.7, 0);
-            bow.rotation.z = Math.PI / 2;
-            this.group.add(bow);
+        if (this.isDummy) {
+            this.createDummyModel();
         } else {
-            // Club/Axe
-            const weapGeo = new THREE.CylinderGeometry(0.06 * s, 0.04 * s, 0.8 * s, 5);
-            const weapMat = new THREE.MeshStandardMaterial({ color: 0x3a2a1a });
-            this.weapon = new THREE.Mesh(weapGeo, weapMat);
-            this.weapon.position.set(0.35 * s, c.bodyHeight * 0.5, 0);
-            this.weapon.rotation.z = 0.3;
-            this.group.add(this.weapon);
+            this.createWarriorModel();
         }
-
-        // Legs
-        const legGeo = new THREE.CylinderGeometry(0.08 * s, 0.1 * s, 0.4, 5);
-        const legMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-        this.leftLeg = new THREE.Mesh(legGeo, legMat);
-        this.leftLeg.position.set(-0.12 * s, 0.2, 0);
-        this.group.add(this.leftLeg);
-        this.rightLeg = new THREE.Mesh(legGeo, legMat);
-        this.rightLeg.position.set(0.12 * s, 0.2, 0);
-        this.group.add(this.rightLeg);
 
         this.group.position.copy(this.position);
         this.scene.add(this.group);
-        this.bodyMat = bodyMat;
+    }
+
+    createDummyModel() {
+        const woodMat = new THREE.MeshStandardMaterial({
+            color: 0x5a4a38, roughness: 0.85, metalness: 0.05,
+        });
+        const strawMat = new THREE.MeshStandardMaterial({
+            color: 0x8a7a55, roughness: 0.95, metalness: 0,
+        });
+
+        // Post
+        const post = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.08, 2.0, 6),
+            woodMat
+        );
+        post.position.y = 1.0;
+        post.castShadow = true;
+        this.group.add(post);
+
+        // Cross beam (arms)
+        const beam = new THREE.Mesh(
+            new THREE.BoxGeometry(1.2, 0.08, 0.08),
+            woodMat
+        );
+        beam.position.y = 1.4;
+        beam.castShadow = true;
+        this.group.add(beam);
+        this.dummyBeam = beam;
+
+        // Straw body
+        const body = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.18, 0.22, 0.6, 8),
+            strawMat
+        );
+        body.position.y = 1.1;
+        body.castShadow = true;
+        this.group.add(body);
+        this.dummyBody = body;
+
+        // Straw head (sack)
+        const head = new THREE.Mesh(
+            new THREE.SphereGeometry(0.14, 8, 6),
+            strawMat
+        );
+        head.position.y = 1.75;
+        head.castShadow = true;
+        this.group.add(head);
+        this.dummyHead = head;
+
+        // X marks on sack (eyes)
+        const markMat = new THREE.MeshStandardMaterial({ color: 0x332211 });
+        const mark1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.01), markMat);
+        mark1.position.set(-0.05, 1.76, 0.13);
+        this.group.add(mark1);
+        const mark2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.01), markMat);
+        mark2.position.set(0.05, 1.76, 0.13);
+        this.group.add(mark2);
+
+        // Base (wooden disc)
+        const base = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.3, 0.35, 0.08, 8),
+            woodMat
+        );
+        base.position.y = 0.04;
+        base.receiveShadow = true;
+        this.group.add(base);
+    }
+
+    createWarriorModel() {
+        const darkMat = new THREE.MeshStandardMaterial({
+            color: this.bodyColor, roughness: 0.6, metalness: 0.2,
+        });
+        const eyeMat = new THREE.MeshStandardMaterial({
+            color: 0xff2200, emissive: 0xff2200, emissiveIntensity: 2,
+        });
+        const clothMat = new THREE.MeshStandardMaterial({
+            color: 0x151012, roughness: 0.85, metalness: 0.0,
+        });
+
+        // Torso
+        const torso = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.55, 0.25),
+            darkMat
+        );
+        torso.position.y = 1.05;
+        torso.castShadow = true;
+        this.group.add(torso);
+        this.enemyTorso = torso;
+
+        // Head
+        const headGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+        const head = new THREE.Mesh(headGeo, darkMat);
+        head.position.y = 1.55;
+        head.castShadow = true;
+        this.group.add(head);
+
+        // Hood
+        const hood = new THREE.Mesh(
+            new THREE.BoxGeometry(0.28, 0.2, 0.28),
+            clothMat
+        );
+        hood.position.y = 1.62;
+        this.group.add(hood);
+
+        // Glowing eyes
+        const leftEye = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 0.02, 0.01),
+            eyeMat
+        );
+        leftEye.position.set(-0.06, 1.55, 0.125);
+        this.group.add(leftEye);
+        this.leftEye = leftEye;
+
+        const rightEye = new THREE.Mesh(
+            new THREE.BoxGeometry(0.04, 0.02, 0.01),
+            eyeMat
+        );
+        rightEye.position.set(0.06, 1.55, 0.125);
+        this.group.add(rightEye);
+        this.rightEye = rightEye;
+
+        // Arms
+        this.enemyRightArm = new THREE.Group();
+        this.enemyRightArm.position.set(0.32, 1.2, 0);
+        const rArm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), darkMat);
+        rArm.position.y = -0.25;
+        rArm.castShadow = true;
+        this.enemyRightArm.add(rArm);
+
+        // Enemy sword
+        const bladeMat = new THREE.MeshStandardMaterial({
+            color: 0x332222, roughness: 0.3, metalness: 0.7,
+            emissive: 0x220000, emissiveIntensity: 0.3,
+        });
+        const sword = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.55, 0.015), bladeMat);
+        sword.position.y = -0.7;
+        this.enemyRightArm.add(sword);
+
+        this.group.add(this.enemyRightArm);
+
+        this.enemyLeftArm = new THREE.Group();
+        this.enemyLeftArm.position.set(-0.32, 1.2, 0);
+        const lArm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.5, 0.1), darkMat);
+        lArm.position.y = -0.25;
+        lArm.castShadow = true;
+        this.enemyLeftArm.add(lArm);
+        this.group.add(this.enemyLeftArm);
+
+        // Legs
+        this.enemyLeftLeg = new THREE.Group();
+        this.enemyLeftLeg.position.set(-0.11, 0.5, 0);
+        const lLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.12), clothMat);
+        lLeg.position.y = -0.25;
+        lLeg.castShadow = true;
+        this.enemyLeftLeg.add(lLeg);
+        this.group.add(this.enemyLeftLeg);
+
+        this.enemyRightLeg = new THREE.Group();
+        this.enemyRightLeg.position.set(0.11, 0.5, 0);
+        const rLeg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.5, 0.12), clothMat);
+        rLeg.position.y = -0.25;
+        rLeg.castShadow = true;
+        this.enemyRightLeg.add(rLeg);
+        this.group.add(this.enemyRightLeg);
+
+        // Glow aura
+        const auraLight = new THREE.PointLight(0xff3300, 0.5, 5);
+        auraLight.position.y = 1.2;
+        this.group.add(auraLight);
+        this.auraLight = auraLight;
     }
 
     update(dt, playerPos) {
         if (!this.alive) {
             this.deathTimer += dt;
-            this.group.position.y -= dt * 2;
-            this.group.scale.multiplyScalar(0.97);
+            // Sink into ground
+            this.group.position.y = -this.deathTimer * 0.5;
+            this.group.rotation.z = this.deathTimer * 0.5;
             if (this.deathTimer > 2) {
                 this.scene.remove(this.group);
-                return 'remove';
+                this.removed = true;
             }
             return;
         }
 
-        this.animTimer += dt;
-        this.stateTimer += dt;
-        if (this.attackCooldown > 0) this.attackCooldown -= dt;
-        if (this.hitFlash > 0) this.hitFlash -= dt;
-
-        const distToPlayer = this.position.distanceTo(playerPos);
-
-        // State machine
-        switch (this.state) {
-            case 'patrol':
-                this.doPatrol(dt, distToPlayer);
-                break;
-            case 'chase':
-                this.doChase(dt, playerPos, distToPlayer);
-                break;
-            case 'attack':
-                this.doAttack(dt, playerPos);
-                break;
-            case 'stagger':
-                this.stateTimer += dt;
-                if (this.stateTimer > 0.5) this.state = 'chase';
-                break;
+        // Hit flash decay
+        if (this.hitFlash > 0) {
+            this.hitFlash -= dt * 5;
         }
 
-        // Gravity & terrain
-        const terrainH = this.terrain.getHeightAt(this.position.x, this.position.z);
-        this.position.y = terrainH;
+        this.stateTimer += dt;
 
-        // Update mesh
-        this.group.position.copy(this.position);
+        if (this.isDummy) {
+            this.updateDummy(dt);
+            return;
+        }
+
+        this.updateWarrior(dt, playerPos);
+    }
+
+    updateDummy(dt) {
+        // Dummy just wobbles when hit
+        if (this.hitFlash > 0) {
+            this.group.rotation.z = Math.sin(this.stateTimer * 20) * 0.1 * this.hitFlash;
+        } else {
+            this.group.rotation.z *= 0.95;
+        }
+    }
+
+    updateWarrior(dt, playerPos) {
+        if (!playerPos) return;
+
+        const dist = this.position.distanceTo(playerPos);
+        const toPlayer = playerPos.clone().sub(this.position).normalize();
+
+        // Face player smoothly
+        this.targetRotation = Math.atan2(toPlayer.x, toPlayer.z);
+        let rotDiff = this.targetRotation - this.rotation;
+        while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+        while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+        this.rotation += rotDiff * Math.min(1, 5 * dt);
         this.group.rotation.y = this.rotation;
 
-        // Leg animation
-        const moveSpeed = Math.sqrt(this.velocity.x ** 2 + this.velocity.z ** 2);
-        if (moveSpeed > 0.5) {
-            this.leftLeg.rotation.x = Math.sin(this.animTimer * 8) * 0.4;
-            this.rightLeg.rotation.x = -Math.sin(this.animTimer * 8) * 0.4;
-        } else {
-            this.leftLeg.rotation.x *= 0.9;
-            this.rightLeg.rotation.x *= 0.9;
-        }
-
-        // Hit flash
-        if (this.hitFlash > 0) {
-            this.bodyMat.emissive.setRGB(0.8, 0.2, 0.2);
-        } else {
-            this.bodyMat.emissive.setRGB(0, 0, 0);
-        }
-    }
-
-    doPatrol(dt, distToPlayer) {
-        if (distToPlayer < this.config.aggroRange) {
-            this.state = 'chase';
-            return;
-        }
-        const dir = this.patrolTarget.clone().sub(this.position);
-        dir.y = 0;
-        if (dir.length() < 1) {
-            this.patrolTarget = this.getRandomPatrolPoint();
-            return;
-        }
-        dir.normalize();
-        this.velocity.set(dir.x * 2, 0, dir.z * 2);
-        this.position.x += this.velocity.x * dt;
-        this.position.z += this.velocity.z * dt;
-        this.rotation = Math.atan2(dir.x, dir.z);
-    }
-
-    doChase(dt, playerPos, distToPlayer) {
-        if (distToPlayer > this.config.aggroRange * 1.5) {
-            this.state = 'patrol';
-            return;
-        }
-        if (distToPlayer < this.config.attackRange) {
-            if (this.attackCooldown <= 0) {
-                this.state = 'attack';
-                this.stateTimer = 0;
+        // Stagger
+        if (this.state === 'stagger') {
+            this.staggerTimer -= dt;
+            this.group.rotation.z = Math.sin(this.stateTimer * 15) * 0.08;
+            if (this.staggerTimer <= 0) {
+                this.state = 'chase';
+                this.group.rotation.z = 0;
             }
             return;
         }
-        const dir = playerPos.clone().sub(this.position);
-        dir.y = 0;
-        dir.normalize();
-        const spd = this.config.speed;
-        this.velocity.set(dir.x * spd, 0, dir.z * spd);
-        this.position.x += this.velocity.x * dt;
-        this.position.z += this.velocity.z * dt;
-        this.rotation = Math.atan2(dir.x, dir.z);
-    }
 
-    doAttack(dt, playerPos) {
-        // Face player
-        const dir = playerPos.clone().sub(this.position);
-        dir.y = 0;
-        this.rotation = Math.atan2(dir.x, dir.z);
-
-        if (this.stateTimer > 0.5) {
+        // AI state machine
+        if (dist < this.attackRange && this.attackTimer <= 0) {
+            this.state = 'attack';
+        } else if (dist < this.aggroRange) {
             this.state = 'chase';
-            this.attackCooldown = this.config.ranged ? 2.0 : 1.5;
-            return 'attack'; // signal to deal damage
+        } else {
+            this.state = 'idle';
         }
 
-        // Wind up animation
-        if (this.weapon) {
-            this.weapon.rotation.z = 0.3 + Math.sin(this.stateTimer * 10) * 1.5;
+        if (this.state === 'chase') {
+            // Walk toward player with animation
+            this.position.add(toPlayer.multiplyScalar(this.speed * dt));
+            this.group.position.copy(this.position);
+
+            // Walk animation
+            const walkT = this.stateTimer * 8;
+            if (this.enemyLeftLeg) {
+                this.enemyLeftLeg.rotation.x = Math.sin(walkT) * 0.5;
+                this.enemyRightLeg.rotation.x = Math.sin(walkT + Math.PI) * 0.5;
+                this.enemyLeftArm.rotation.x = Math.sin(walkT + Math.PI) * 0.3;
+                this.enemyRightArm.rotation.x = Math.sin(walkT) * 0.25;
+            }
+        } else if (this.state === 'attack') {
+            this.attackTimer = this.attackCooldown;
+
+            // Attack animation
+            if (this.enemyRightArm) {
+                this.enemyRightArm.rotation.x = -2.0;
+            }
+        }
+
+        // Attack cooldown
+        if (this.attackTimer > 0) {
+            this.attackTimer -= dt;
+
+            // Attack swing animation
+            const t = 1 - (this.attackTimer / this.attackCooldown);
+            if (t < 0.3 && this.enemyRightArm) {
+                this.enemyRightArm.rotation.x = -2.0 + t / 0.3 * 2.0;
+            }
+        }
+
+        // Eye flicker
+        if (this.auraLight) {
+            this.auraLight.intensity = 0.4 + Math.sin(this.stateTimer * 5) * 0.15;
+        }
+
+        // Idle sway
+        if (this.state === 'idle') {
+            this.group.position.y = Math.sin(this.stateTimer * 2) * 0.02;
+            if (this.enemyLeftLeg) {
+                this.enemyLeftLeg.rotation.x *= 0.95;
+                this.enemyRightLeg.rotation.x *= 0.95;
+                this.enemyLeftArm.rotation.x *= 0.95;
+                this.enemyRightArm.rotation.x *= 0.95;
+            }
         }
     }
 
     takeDamage(amount, knockbackDir) {
+        if (!this.alive) return;
+
         this.health -= amount;
-        this.hitFlash = 0.15;
-        this.state = 'stagger';
+        this.hitFlash = 1;
         this.stateTimer = 0;
 
-        if (knockbackDir) {
-            this.position.x += knockbackDir.x * 2;
-            this.position.z += knockbackDir.z * 2;
+        if (!this.isDummy) {
+            // Knockback
+            if (knockbackDir) {
+                this.position.add(knockbackDir.clone().normalize().multiplyScalar(1.5));
+                this.group.position.copy(this.position);
+            }
+
+            // Stagger
+            this.state = 'stagger';
+            this.staggerTimer = this.staggerDuration;
         }
 
-        if (this.health <= 0) {
+        if (this.health <= 0 && !this.isDummy) {
             this.alive = false;
-            this.health = 0;
+            this.state = 'dead';
         }
+    }
+
+    isAttacking() {
+        if (!this.alive || this.isDummy) return false;
+        const t = 1 - (this.attackTimer / this.attackCooldown);
+        return this.attackTimer > 0 && t >= 0.2 && t <= 0.35;
+    }
+
+    getAttackBounds() {
+        if (!this.isAttacking()) return null;
+        const fwd = new THREE.Vector3(Math.sin(this.rotation), 0, Math.cos(this.rotation));
+        const center = this.position.clone().add(fwd.multiplyScalar(1.0));
+        center.y += 0.8;
+        return { center, radius: 1.5 };
     }
 }
-
-export class EnemySpawner {
-    constructor(scene, terrain) {
-        this.scene = scene;
-        this.terrain = terrain;
-        this.enemies = [];
-        this.spawnCamps();
-    }
-
-    spawnCamps() {
-        const camps = [
-            { x: 30, z: 20, types: ['goblin', 'goblin', 'goblin'] },
-            { x: -40, z: 30, types: ['orc', 'goblin'] },
-            { x: 50, z: -30, types: ['skeleton', 'skeleton', 'goblin'] },
-            { x: -20, z: -50, types: ['orc', 'orc'] },
-            { x: 70, z: 50, types: ['goblin', 'goblin', 'goblin', 'goblin'] },
-            { x: -60, z: -20, types: ['skeleton', 'orc', 'goblin'] },
-            { x: 80, z: -60, types: ['orc', 'skeleton', 'skeleton'] },
-            { x: -80, z: 60, types: ['goblin', 'goblin', 'orc', 'skeleton'] },
-            { x: 20, z: 70, types: ['orc', 'orc', 'orc'] },
-            { x: -50, z: -80, types: ['skeleton', 'skeleton', 'skeleton'] },
-        ];
-
-        for (const camp of camps) {
-            for (const type of camp.types) {
-                const offsetX = camp.x + (Math.random() - 0.5) * 8;
-                const offsetZ = camp.z + (Math.random() - 0.5) * 8;
-                const enemy = new Enemy(this.scene, this.terrain, offsetX, offsetZ, type);
-                this.enemies.push(enemy);
-            }
-        }
-    }
-
-    update(dt, playerPos) {
-        for (let i = this.enemies.length - 1; i >= 0; i--) {
-            const result = this.enemies[i].update(dt, playerPos);
-            if (result === 'remove') {
-                this.enemies.splice(i, 1);
-            }
-        }
-    }
-
-    getAliveEnemies() {
-        return this.enemies.filter(e => e.alive);
-    }
-}
-
-export { ENEMY_TYPES };

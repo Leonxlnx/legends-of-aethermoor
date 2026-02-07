@@ -1,52 +1,106 @@
 import * as THREE from 'three';
 
-// Third Person Camera - Orbits around player
 export class ThirdPersonCamera {
     constructor(camera) {
         this.camera = camera;
-        this.target = new THREE.Vector3();
-        this.distance = 8;
+
+        // Orbital parameters
+        this.distance = 6;
         this.minDistance = 3;
-        this.maxDistance = 15;
-        this.phi = 0.3; // vertical angle
-        this.theta = 0; // horizontal angle
-        this.sensitivity = 0.003;
-        this.smoothing = 0.08;
+        this.maxDistance = 12;
+        this.phi = 0.35;              // vertical angle (0 = level, positive = above)
+        this.theta = 0;               // horizontal angle
+        this.sensitivity = 0.002;
+        this.minPhi = -0.1;
+        this.maxPhi = 1.2;
+
+        // Smooth follow
         this.currentPos = new THREE.Vector3();
         this.currentLookAt = new THREE.Vector3();
-        this.offset = new THREE.Vector3(0, 2.5, 0); // look above player feet
+        this.targetOffset = new THREE.Vector3(0, 1.6, 0); // Look at character upper body
+        this.smoothSpeed = 6;
 
-        document.addEventListener('wheel', (e) => {
-            this.distance += e.deltaY * 0.005;
-            this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
-        });
+        // Collision
+        this.raycaster = new THREE.Raycaster();
+
+        // Cinematic mode
+        this.cinematicTarget = null;
+        this.cinematicPos = null;
+        this.cinematicBlend = 0;
     }
 
     update(playerPos, mouseDelta, dt) {
-        this.theta -= mouseDelta.dx * this.sensitivity;
-        this.phi -= mouseDelta.dy * this.sensitivity;
-        this.phi = Math.max(-0.5, Math.min(1.2, this.phi));
+        // Mouse rotation — FIXED: correct directions
+        this.theta += mouseDelta.dx * this.sensitivity;  // FIXED: was -= (caused mirroring)
+        this.phi += mouseDelta.dy * this.sensitivity;     // FIXED: was -= 
+        this.phi = Math.max(this.minPhi, Math.min(this.maxPhi, this.phi));
 
-        this.target.copy(playerPos).add(this.offset);
+        // Calculate ideal orbital position
+        const lookTarget = playerPos.clone().add(this.targetOffset);
 
-        const idealX = this.target.x + this.distance * Math.cos(this.phi) * Math.sin(this.theta);
-        const idealY = this.target.y + this.distance * Math.sin(this.phi);
-        const idealZ = this.target.z + this.distance * Math.cos(this.phi) * Math.cos(this.theta);
-
+        const idealX = lookTarget.x + this.distance * Math.sin(this.theta) * Math.cos(this.phi);
+        const idealY = lookTarget.y + this.distance * Math.sin(this.phi);
+        const idealZ = lookTarget.z + this.distance * Math.cos(this.theta) * Math.cos(this.phi);
         const idealPos = new THREE.Vector3(idealX, idealY, idealZ);
 
-        this.currentPos.lerp(idealPos, this.smoothing);
-        this.currentLookAt.lerp(this.target, this.smoothing * 2);
+        // Ensure camera doesn't go below ground
+        idealPos.y = Math.max(idealPos.y, 1.0);
 
-        this.camera.position.copy(this.currentPos);
-        this.camera.lookAt(this.currentLookAt);
+        // Smooth interpolation
+        const lerpFactor = 1 - Math.exp(-this.smoothSpeed * dt);
+        this.currentPos.lerp(idealPos, lerpFactor);
+        this.currentLookAt.lerp(lookTarget, lerpFactor);
+
+        // Cinematic override (for intro)
+        if (this.cinematicTarget) {
+            this.cinematicBlend = Math.min(1, this.cinematicBlend + dt * 0.8);
+            const t = this.cinematicBlend;
+            const smoothT = t * t * (3 - 2 * t); // smoothstep
+
+            const finalPos = this.currentPos.clone().lerp(this.cinematicPos, smoothT);
+            const finalLook = this.currentLookAt.clone().lerp(this.cinematicTarget, smoothT);
+
+            this.camera.position.copy(finalPos);
+            this.camera.lookAt(finalLook);
+        } else {
+            this.camera.position.copy(this.currentPos);
+            this.camera.lookAt(this.currentLookAt);
+        }
     }
 
+    // Camera-relative movement directions
     getForward() {
-        return new THREE.Vector3(-Math.sin(this.theta), 0, -Math.cos(this.theta)).normalize();
+        return new THREE.Vector3(
+            -Math.sin(this.theta),
+            0,
+            -Math.cos(this.theta)
+        ).normalize();
     }
 
     getRight() {
-        return new THREE.Vector3(-Math.cos(this.theta), 0, Math.sin(this.theta)).normalize();
+        return new THREE.Vector3(
+            -Math.cos(this.theta),
+            0,
+            Math.sin(this.theta)
+        ).normalize();
+    }
+
+    // Zoom
+    handleScroll(deltaY) {
+        this.distance += deltaY * 0.003;
+        this.distance = Math.max(this.minDistance, Math.min(this.maxDistance, this.distance));
+    }
+
+    // Cinematic: smoothly move camera to a fixed view
+    setCinematic(position, lookAt) {
+        this.cinematicPos = position.clone();
+        this.cinematicTarget = lookAt.clone();
+        this.cinematicBlend = 0;
+    }
+
+    clearCinematic() {
+        this.cinematicTarget = null;
+        this.cinematicPos = null;
+        this.cinematicBlend = 0;
     }
 }

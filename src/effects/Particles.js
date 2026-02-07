@@ -3,85 +3,131 @@ import * as THREE from 'three';
 export class Particles {
     constructor(scene) {
         this.scene = scene;
-        this.systems = [];
+        this.particles = [];
+        this.dustParticles = [];
+        this.createDust();
     }
 
-    emit(position, config) {
-        const { count = 10, color = 0xffaa00, size = 0.15, speed = 3, life = 0.8, spread = 1, gravity = -5 } = config;
-
+    createDust() {
+        // Ambient floating dust motes
+        const count = 120;
         const geo = new THREE.BufferGeometry();
         const positions = new Float32Array(count * 3);
-        const velocities = [];
+        const sizes = new Float32Array(count);
 
         for (let i = 0; i < count; i++) {
-            positions[i * 3] = position.x;
-            positions[i * 3 + 1] = position.y;
-            positions[i * 3 + 2] = position.z;
-            velocities.push(new THREE.Vector3(
-                (Math.random() - 0.5) * spread * speed,
-                Math.random() * speed,
-                (Math.random() - 0.5) * spread * speed
-            ));
+            positions[i * 3] = (Math.random() - 0.5) * 40;
+            positions[i * 3 + 1] = Math.random() * 8;
+            positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+            sizes[i] = 0.02 + Math.random() * 0.04;
         }
 
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
         const mat = new THREE.PointsMaterial({
-            color,
-            size,
+            color: 0xccbb99,
+            size: 0.06,
             transparent: true,
-            opacity: 1,
+            opacity: 0.3,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
+            sizeAttenuation: true,
         });
 
-        const points = new THREE.Points(geo, mat);
-        this.scene.add(points);
-
-        this.systems.push({ points, velocities, life, maxLife: life, gravity, geo });
+        this.dustMesh = new THREE.Points(geo, mat);
+        this.scene.add(this.dustMesh);
     }
 
+    // Spawn burst effect
+    burst(position, color = 0xffaa44, count = 12, speed = 3) {
+        for (let i = 0; i < count; i++) {
+            const dir = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                Math.random() * 1.5 + 0.3,
+                (Math.random() - 0.5) * 2
+            ).normalize().multiplyScalar(speed * (0.5 + Math.random() * 0.5));
+
+            const geo = new THREE.SphereGeometry(0.02 + Math.random() * 0.03, 4, 3);
+            const mat = new THREE.MeshStandardMaterial({
+                color: color,
+                emissive: color,
+                emissiveIntensity: 2,
+                transparent: true,
+                opacity: 1,
+            });
+
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.copy(position);
+            this.scene.add(mesh);
+
+            this.particles.push({
+                mesh,
+                velocity: dir,
+                life: 0.4 + Math.random() * 0.3,
+                maxLife: 0.4 + Math.random() * 0.3,
+                gravity: -8,
+            });
+        }
+    }
+
+    // Hit sparks
     hitSparks(position) {
-        this.emit(position, { count: 15, color: 0xffdd44, size: 0.12, speed: 5, life: 0.5, spread: 0.8 });
-        this.emit(position, { count: 8, color: 0xff6600, size: 0.2, speed: 3, life: 0.6, spread: 0.5 });
+        this.burst(position, 0xffcc66, 8, 4);
+        // Small flash
+        this.burst(position, 0xffffff, 3, 1);
     }
 
-    bloodSplash(position) {
-        this.emit(position, { count: 12, color: 0x880000, size: 0.15, speed: 4, life: 0.7, spread: 1.0, gravity: -8 });
-    }
-
+    // Dodge dust
     dodgeDust(position) {
-        this.emit(position, { count: 8, color: 0xaa9966, size: 0.25, speed: 2, life: 0.5, spread: 1.5, gravity: -1 });
-    }
-
-    deathBurst(position) {
-        this.emit(position, { count: 30, color: 0x440066, size: 0.2, speed: 6, life: 1.2, spread: 1.2 });
-        this.emit(position, { count: 20, color: 0xff2200, size: 0.15, speed: 4, life: 0.8, spread: 0.8 });
+        this.burst(
+            new THREE.Vector3(position.x, 0.1, position.z),
+            0x887766, 6, 1.5
+        );
     }
 
     update(dt) {
-        for (let i = this.systems.length - 1; i >= 0; i--) {
-            const sys = this.systems[i];
-            sys.life -= dt;
+        // Update active particles
+        for (let i = this.particles.length - 1; i >= 0; i--) {
+            const p = this.particles[i];
+            p.life -= dt;
 
-            if (sys.life <= 0) {
-                this.scene.remove(sys.points);
-                sys.geo.dispose();
-                sys.points.material.dispose();
-                this.systems.splice(i, 1);
+            if (p.life <= 0) {
+                this.scene.remove(p.mesh);
+                p.mesh.geometry.dispose();
+                p.mesh.material.dispose();
+                this.particles.splice(i, 1);
                 continue;
             }
 
-            const pos = sys.geo.attributes.position;
-            for (let j = 0; j < sys.velocities.length; j++) {
-                sys.velocities[j].y += sys.gravity * dt;
-                pos.setX(j, pos.getX(j) + sys.velocities[j].x * dt);
-                pos.setY(j, pos.getY(j) + sys.velocities[j].y * dt);
-                pos.setZ(j, pos.getZ(j) + sys.velocities[j].z * dt);
+            p.velocity.y += p.gravity * dt;
+            p.mesh.position.add(p.velocity.clone().multiplyScalar(dt));
+            p.mesh.material.opacity = (p.life / p.maxLife);
+
+            // Scale down
+            const scale = p.life / p.maxLife;
+            p.mesh.scale.setScalar(scale);
+        }
+
+        // Animate ambient dust
+        if (this.dustMesh) {
+            const pos = this.dustMesh.geometry.attributes.position;
+            const time = performance.now() * 0.001;
+
+            for (let i = 0; i < pos.count; i++) {
+                let y = pos.getY(i);
+                y += Math.sin(time + i * 0.7) * 0.003;
+
+                // Subtle drift
+                let x = pos.getX(i) + Math.sin(time * 0.3 + i) * 0.002;
+
+                // Reset if too high
+                if (y > 8) y = 0;
+
+                pos.setY(i, y);
+                pos.setX(i, x);
             }
             pos.needsUpdate = true;
-
-            sys.points.material.opacity = sys.life / sys.maxLife;
         }
     }
 }

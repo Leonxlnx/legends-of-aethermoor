@@ -1,116 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Legends of Aethermoor</title>
-  <link rel="stylesheet" href="/src/styles.css">
+  <meta name="description" content="A dark fantasy action experience" />
 </head>
+
 <body>
-  <!-- Loading Screen -->
+
+  <!-- Loading -->
   <div id="loading-screen">
-    <div class="loading-content">
-      <h1 class="game-title">LEGENDS OF AETHERMOOR</h1>
-      <p class="game-subtitle">The Awakening</p>
-      <div class="loading-bar-container">
-        <div class="loading-bar" id="loading-bar"></div>
-      </div>
-      <p class="loading-text" id="loading-text">Loading world...</p>
+    <h1>Aethermoor</h1>
+    <div class="loading-bar-track">
+      <div class="loading-bar-fill" id="loading-fill"></div>
     </div>
   </div>
 
-  <!-- Story Intro -->
-  <div id="story-intro" class="hidden">
-    <div class="story-content">
-      <div class="story-text" id="story-text"></div>
-      <p class="story-skip">Press any key to continue</p>
-    </div>
+  <!-- Story -->
+  <div id="story-overlay">
+    <div id="story-text"></div>
+    <div id="story-continue">Press any key to continue</div>
   </div>
 
-  <!-- HUD -->
-  <div id="hud" class="hidden">
-    <!-- Health -->
-    <div class="hud-top-left">
-      <div class="player-name">Aether Knight</div>
-      <div class="health-bar-container">
-        <div class="health-bar" id="health-bar"></div>
-        <span class="health-text" id="health-text">100/100</span>
-      </div>
-      <div class="stamina-bar-container">
-        <div class="stamina-bar" id="stamina-bar"></div>
-      </div>
-    </div>
-
-    <!-- Minimap -->
-    <div class="hud-top-right">
-      <canvas id="minimap" width="180" height="180"></canvas>
-    </div>
-
-    <!-- Enemy Health (when locked on) -->
-    <div class="enemy-health-container hidden" id="enemy-hud">
-      <div class="enemy-name" id="enemy-name">Enemy</div>
-      <div class="enemy-health-bar-container">
-        <div class="enemy-health-bar" id="enemy-health-bar"></div>
-      </div>
-    </div>
-
-    <!-- Bottom HUD -->
-    <div class="hud-bottom">
-      <div class="controls-hint">
-        <span>WASD Move</span>
-        <span>SHIFT Sprint</span>
-        <span>SPACE Jump</span>
-        <span>LMB Attack</span>
-        <span>RMB Dodge</span>
-        <span>Q Lock-On</span>
-      </div>
-    </div>
-
-    <!-- Crosshair -->
-    <div id="crosshair" class="hidden">
-      <div class="crosshair-ring"></div>
-    </div>
-
-    <!-- Damage Flash -->
-    <div id="damage-flash"></div>
-
-    <!-- Combo Counter -->
-    <div id="combo-counter" class="hidden">
-      <span class="combo-number" id="combo-number">0</span>
-      <span class="combo-text">HIT COMBO</span>
-    </div>
-
-    <!-- Dialogue Box -->
-    <div id="dialogue-box" class="hidden">
-      <div class="dialogue-speaker" id="dialogue-speaker"></div>
-      <div class="dialogue-text" id="dialogue-text"></div>
-      <div class="dialogue-continue">Press E to continue</div>
-    </div>
-
-    <!-- Objective -->
-    <div id="objective-display" class="hidden">
-      <div class="objective-label">OBJECTIVE</div>
-      <div class="objective-text" id="objective-text"></div>
-    </div>
+  <!-- Start -->
+  <div id="start-prompt">
+    <h2>Click to begin</h2>
   </div>
 
-  <!-- Start Screen (after story) -->
-  <div id="start-screen" class="hidden">
-    <div class="start-content">
-      <p class="start-text">Click to begin your adventure</p>
-    </div>
+  <!-- Death -->
+  <div id="death-screen">
+    <h2>Fallen</h2>
+    <button id="respawn-btn">Rise Again</button>
   </div>
 
-  <!-- Death Screen -->
-  <div id="death-screen" class="hidden">
-    <div class="death-content">
-      <h2>YOU DIED</h2>
-      <p>The darkness claims another soul...</p>
-      <button id="respawn-btn">Rise Again</button>
-    </div>
-  </div>
+  <!-- Damage flash -->
+  <div id="damage-flash"></div>
 
-  <canvas id="game-canvas"></canvas>
   <script type="module" src="/src/main.js"></script>
 </body>
+
 </html>
